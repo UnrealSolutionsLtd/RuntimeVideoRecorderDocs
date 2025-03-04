@@ -2,6 +2,8 @@
 
 ## How to use
 
+Licensing: https://unrealsolutions.com/
+
 UPD: [Video Tutorial](https://youtu.be/dmlnrD67Wx8)
 
 Go to any Blueprint, grab reference to RuntimeVideoRecorder and call Start/Stop recording. You can provide desired width, height and fps if needed. Example:
