@@ -2,7 +2,7 @@
 
 ## How to use
 
-Licensing: https://unrealsolutions.com/
+Download here: https://unrealsolutions.com/download
 
 Roadmap: https://docs.google.com/document/d/1EN-KGQoj6XTF2DsdeUTCL4PTeosyGVI2G52iUeMTJ4g/edit?usp=drive_link
 
