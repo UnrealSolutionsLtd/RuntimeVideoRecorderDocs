@@ -45,10 +45,10 @@ Runtime Video Recorder (RVR) is a production-ready Unreal Engine plugin that ena
 | Platform | Status | Hardware Acceleration | Encoder |
 |----------|--------|----------------------|---------|
 | Windows (Win64) | ✅ Full Support | ✅ Yes (WMF) | H.264 |
-| macOS | ✅ Full Support | ✅ Yes (AVFoundation) | H.264 |
-| Linux | ✅ Full Support | ❌ Software | OpenH264 |
+| MacOS | ✅ Full Support | ✅ Yes (AVFoundation) | H.264 |
 | Android | ✅ Full Support | ✅ Yes (MediaCodec) | H.264 |
 | Oculus | ✅ Full Support | ✅ Yes (MediaCodec) | H.264 |
+| Linux | ✅ Full Support | ❌ Software | OpenH264 |
 
 ---
 
