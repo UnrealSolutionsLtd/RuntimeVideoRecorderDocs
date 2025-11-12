@@ -1,5 +1,5 @@
 <div align="center">
-# Runtime Video Recorder (RVR)
+## Runtime Video Recorder (RVR)
 
 ![Version](https://img.shields.io/badge/version-2.0-blue.svg)
 ![UE5](https://img.shields.io/badge/Unreal%20Engine-5.3%2B-informational.svg)
