@@ -11,7 +11,7 @@ Runtime Video Recorder (RVR)
 
 ## Overview
 
-Runtime Video Recorder (RVR) is a production-ready Unreal Engine plugin that enables **MP4 video recording at runtime without game or render thread hitches**. Built with performance in mind, it supports hardware-accelerated encoding on Windows (WMF), macOS (AVFoundation), Linux/Android (OpenH264), and includes specialized features for VR and multi-camera setups.
+Runtime Video Recorder (RVR) is a production-ready Unreal Engine plugin that enables **MP4 video recording at runtime without game or render thread hitches**. Built with performance in mind, it supports hardware-accelerated encoding on Windows (WMF), MacOS (AVFoundation), Oculus/Android (MediaCodec), Linux (OpenH264), and includes specialized features for VR and multi-camera setups.
 
 ### Key Features
 
