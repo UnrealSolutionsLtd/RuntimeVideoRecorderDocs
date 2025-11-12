@@ -3,7 +3,6 @@
 
 ![Version](https://img.shields.io/badge/version-2.0-blue.svg)
 ![UE5](https://img.shields.io/badge/Unreal%20Engine-5.3%2B-informational.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 **High-performance video recording plugin for Unreal Engine**
 
