@@ -1,4 +1,3 @@
-<div align="center">
 Runtime Video Recorder (RVR)
 
 ![Version](https://img.shields.io/badge/version-2.0-blue.svg)
@@ -7,8 +6,6 @@ Runtime Video Recorder (RVR)
 **High-performance video recording plugin for Unreal Engine**
 
 [Features](#features) • [Installation](#installation) • [Quick Start](#quick-start) • [API Reference](#api-reference) • [Support](#support)
-
-</div>
 
 ---
 
