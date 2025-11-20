@@ -71,12 +71,8 @@ This repository includes pre-compiled libraries (x264, lsmash, mp4v2) for variou
 
 #### Using GitHub Actions (Manual Trigger)
 1. Go to the **Actions** tab in your GitHub repository
-2. Select a workflow:
-   - **Build MP4v2 (CMake) for Multiple Platforms** - Recommended, supports ARM64 and x64
-   - **Build MP4v2 for Linux ARM64 (Autotools)** - Autotools-based build
-   - **Build MP4v2 (Native ARM64 Runners)** - For GitHub Enterprise with ARM64 runners
+2. Select a workflow (LinuxARM64)
 3. Click **Run workflow**
-4. Select platform (for CMake workflow): `linux-arm64`, `linux-x64`, or `all`
 5. Download the artifacts once the build completes
 
 #### Manual Build for Linux ARM64
