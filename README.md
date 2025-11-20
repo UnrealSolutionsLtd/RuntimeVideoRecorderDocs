@@ -96,8 +96,6 @@ docker run --rm --platform linux/arm64 \
 
 The GitHub workflows support:
 - **Linux ARM64** - Using QEMU-based cross-compilation
-- **Linux x64** - Native compilation
-- Both **Autotools** and **CMake** build systems
 
 ---
 
