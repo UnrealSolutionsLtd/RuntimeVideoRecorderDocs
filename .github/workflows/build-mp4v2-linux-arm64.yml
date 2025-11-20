@@ -1,10 +1,6 @@
-name: Build MP4v2 for Linux ARM64
+name: Build MP4v2 for Linux ARM64 (Autotools)
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:

@@ -1,10 +1,6 @@
 name: Build MP4v2 (CMake) for Multiple Platforms
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
     inputs:
       platforms:
@@ -14,7 +10,7 @@ on:
 
 jobs:
   build-linux-arm64:
-    if: github.event_name != 'workflow_dispatch' || contains(github.event.inputs.platforms, 'linux-arm64') || contains(github.event.inputs.platforms, 'all')
+    if: contains(github.event.inputs.platforms, 'linux-arm64') || contains(github.event.inputs.platforms, 'all')
     runs-on: ubuntu-latest
     
     steps:
@@ -108,7 +104,7 @@ jobs:
         retention-days: 90
 
   build-linux-x64:
-    if: github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.platforms, 'linux-x64') || contains(github.event.inputs.platforms, 'all'))
+    if: contains(github.event.inputs.platforms, 'linux-x64') || contains(github.event.inputs.platforms, 'all')
     runs-on: ubuntu-latest
     
     steps:

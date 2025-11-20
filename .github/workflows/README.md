@@ -14,9 +14,7 @@ This directory contains GitHub Actions workflows for building the MP4v2 library 
 - Uploads artifacts for download
 
 **Triggers:**
-- Push to `main` or `master` branches
-- Pull requests
-- Manual workflow dispatch
+- Manual workflow dispatch only
 
 **Output:**
 - Static library: `Linux/arm64/libmp4v2.a`
@@ -44,8 +42,6 @@ This directory contains GitHub Actions workflows for building the MP4v2 library 
 - Separate jobs for each platform
 
 **Triggers:**
-- Push to `main` or `master` branches (ARM64 only)
-- Pull requests (ARM64 only)
 - Manual workflow dispatch with platform selection
 
 **Output:**
@@ -73,6 +69,7 @@ This directory contains GitHub Actions workflows for building the MP4v2 library 
 | Auto Commit | Yes | No |
 | Artifact Retention | 30 days | 90 days |
 | Platform Selection | No | Yes (workflow_dispatch) |
+| Trigger | Manual only | Manual only |
 
 ---
 

@@ -54,13 +54,7 @@ This repository now has **3 automated workflows** for building MP4v2 library for
 
 ## 🚀 How to Use
 
-### Option 1: Automatic Build (Recommended)
-
-1. Push code to `main` or `master` branch
-2. Workflow runs automatically
-3. Built libraries appear in repository (if using workflow #1)
-
-### Option 2: Manual Trigger
+### Option 1: Manual Trigger via GitHub Actions (Recommended)
 
 1. Go to **Actions** tab
 2. Select a workflow
@@ -68,7 +62,7 @@ This repository now has **3 automated workflows** for building MP4v2 library for
 4. Choose options (if available)
 5. Download artifacts when complete
 
-### Option 3: Local Build
+### Option 2: Local Build
 
 ```bash
 # Use the quick start command:
@@ -94,7 +88,7 @@ docker run --rm --platform linux/arm64 \
 |---------|-------------|-------------|-------------|
 | **Build System** | Autotools | CMake | Both |
 | **Platforms** | ARM64 | ARM64 + x64 | ARM64 |
-| **Trigger** | Auto + Manual | Auto + Manual | Manual Only |
+| **Trigger** | Manual Only | Manual Only | Manual Only |
 | **Auto-commit** | ✅ Yes | ❌ No | ⚙️ Optional |
 | **Runner Type** | Standard (QEMU) | Standard (QEMU) | Native ARM64 |
 | **Speed** | ~8 min | ~5 min | ~2 min |

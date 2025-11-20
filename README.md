@@ -69,11 +69,15 @@ The plugin automatically enables these required plugins:
 
 This repository includes pre-compiled libraries (x264, lsmash, mp4v2) for various platforms. To build MP4v2 for Linux ARM64:
 
-#### Using GitHub Actions (Automated)
+#### Using GitHub Actions (Manual Trigger)
 1. Go to the **Actions** tab in your GitHub repository
-2. Select **Build MP4v2 for Linux ARM64** or **Build MP4v2 (CMake) for Multiple Platforms**
+2. Select a workflow:
+   - **Build MP4v2 (CMake) for Multiple Platforms** - Recommended, supports ARM64 and x64
+   - **Build MP4v2 for Linux ARM64 (Autotools)** - Autotools-based build
+   - **Build MP4v2 (Native ARM64 Runners)** - For GitHub Enterprise with ARM64 runners
 3. Click **Run workflow**
-4. Download the artifacts once the build completes
+4. Select platform (for CMake workflow): `linux-arm64`, `linux-x64`, or `all`
+5. Download the artifacts once the build completes
 
 #### Manual Build for Linux ARM64
 ```bash
