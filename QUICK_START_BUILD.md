@@ -23,17 +23,17 @@ docker run --rm --platform linux/arm64 \
   -v $(pwd):/workspace \
   arm64v8/ubuntu:22.04 \
   bash -c "
-    apt-get update && apt-get install -y build-essential cmake git && \
+    apt-get update && apt-get install -y build-essential cmake git file && \
     git clone --depth 1 https://github.com/enzo1982/mp4v2.git && \
     cd mp4v2 && mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
-    make -j\$(nproc) && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/tmp/install && \
+    make -j\$(nproc) && make install && \
     mkdir -p /workspace/Linux/arm64 && \
-    find . -name 'libmp4v2.a' -exec cp {} /workspace/Linux/arm64/ \;
+    cp -P /tmp/install/lib/libmp4v2.so* /workspace/Linux/arm64/
   "
 ```
 
-**Output:** `Linux/arm64/libmp4v2.a`
+**Output:** `Linux/arm64/libmp4v2.so*` (shared libraries with version symlinks)
 
 ---
 
@@ -50,10 +50,11 @@ sudo apt-get install -y build-essential cmake git
 git clone https://github.com/enzo1982/mp4v2.git
 cd mp4v2
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=$PWD/install
 make -j$(nproc)
+make install
 
-# Output: libmp4v2.a in current directory
+# Output: install/lib/libmp4v2.so* (shared libraries)
 ```
 
 ---
@@ -68,9 +69,13 @@ cd mp4v2
 mkdir build && cd build
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+  -DBUILD_SHARED_LIBS=ON \
+  -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+  -DCMAKE_INSTALL_PREFIX=$PWD/install
 make -j$(sysctl -n hw.ncpu)
+make install
+
+# Output: install/lib/libmp4v2.dylib (universal shared library)
 ```
 
 ---
@@ -82,8 +87,11 @@ git clone https://github.com/enzo1982/mp4v2.git
 cd mp4v2
 mkdir build
 cd build
-cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=OFF
+cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=install
 cmake --build . --config Release
+cmake --install . --config Release
+
+# Output: install\bin\mp4v2.dll and install\lib\mp4v2.lib
 ```
 
 ---
@@ -92,15 +100,19 @@ cmake --build . --config Release
 
 ```bash
 # Check architecture
-file Linux/arm64/libmp4v2.a
-# Expected: "current ar archive" (ARM aarch64)
+file Linux/arm64/libmp4v2.so*
+# Expected: "ELF 64-bit LSB shared object, ARM aarch64"
 
-# Check size
-ls -lh Linux/arm64/libmp4v2.a
-# Expected: ~2-4 MB
+# Check size and symlinks
+ls -lh Linux/arm64/
+# Expected: libmp4v2.so.2.1.3, libmp4v2.so.2 -> libmp4v2.so.2.1.3, libmp4v2.so -> libmp4v2.so.2
 
-# List contents
-ar -t Linux/arm64/libmp4v2.a | head
+# Check dependencies
+readelf -d Linux/arm64/libmp4v2.so.2.1.3 | grep NEEDED
+# Shows required system libraries
+
+# Check symbols
+nm -D Linux/arm64/libmp4v2.so.2.1.3 | grep MP4Create
 ```
 
 ---
@@ -152,11 +164,15 @@ After building, place files here:
 YourProject/
 ├── Linux/
 │   └── arm64/
-│       └── libmp4v2.a          ← Here
+│       ├── libmp4v2.so.2.1.3   ← Actual library
+│       ├── libmp4v2.so.2       ← Symlink to .2.1.3
+│       └── libmp4v2.so         ← Symlink to .2
 └── include/
     └── mp4v2/
         └── *.h                 ← Headers here
 ```
+
+**Note:** Make sure to preserve symlinks when copying (use `cp -P` or `cp -a`)
 
 ---
 

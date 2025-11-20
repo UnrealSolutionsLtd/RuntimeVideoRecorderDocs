@@ -39,22 +39,23 @@ jobs:
               autoconf \
               automake \
               libtool \
-              pkg-config && \
+              pkg-config \
+              file && \
             
             # Clone mp4v2 repository
             git clone https://github.com/enzo1982/mp4v2.git && \
             cd mp4v2 && \
             
-            # Build using autotools
+            # Build using autotools (shared libraries)
             autoreconf -i && \
-            ./configure --prefix=/build/install && \
+            ./configure --prefix=/build/install --enable-shared && \
             make -j\$(nproc) && \
             make install && \
             
             # Copy built libraries to workspace
             mkdir -p /workspace/Linux/arm64 && \
-            cp /build/install/lib/libmp4v2.a /workspace/Linux/arm64/ && \
-            cp /build/install/lib/libmp4v2.so* /workspace/Linux/arm64/ 2>/dev/null || true && \
+            cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/arm64/ 2>/dev/null || true && \
+            cp /build/install/lib/libmp4v2.a /workspace/Linux/arm64/ 2>/dev/null || true && \
             
             # Copy headers
             mkdir -p /workspace/include/mp4v2 && \
@@ -63,8 +64,12 @@ jobs:
       
     - name: Verify build artifacts
       run: |
+        echo "=== Build Artifacts ==="
         ls -lh Linux/arm64/
-        file Linux/arm64/libmp4v2.a
+        echo ""
+        echo "=== Library Details ==="
+        file Linux/arm64/libmp4v2.so* 2>/dev/null || echo "No shared libraries"
+        file Linux/arm64/libmp4v2.a 2>/dev/null || echo "No static library"
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

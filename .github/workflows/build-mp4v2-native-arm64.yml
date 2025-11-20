@@ -43,30 +43,33 @@ jobs:
       run: |
         cd /tmp/mp4v2
         autoreconf -i
-        ./configure --prefix=$PWD/install --enable-static --disable-shared
+        ./configure --prefix=$PWD/install --enable-shared
         make -j$(nproc)
         make install
         
     - name: Copy Autotools artifacts
       run: |
         mkdir -p Linux/arm64
-        cp /tmp/mp4v2/install/lib/libmp4v2.a Linux/arm64/libmp4v2-autotools.a
+        cp -P /tmp/mp4v2/install/lib/libmp4v2.so* Linux/arm64/ 2>/dev/null || true
+        cp /tmp/mp4v2/install/lib/libmp4v2.a Linux/arm64/ 2>/dev/null || true
         
     - name: Build with CMake
       run: |
         cd /tmp/mp4v2
-        rm -rf build
+        rm -rf build install
         mkdir build && cd build
         cmake .. \
           -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DCMAKE_INSTALL_PREFIX=$PWD/install
+          -DBUILD_SHARED_LIBS=ON \
+          -DCMAKE_INSTALL_PREFIX=/tmp/mp4v2/install
         make -j$(nproc)
+        make install
         
     - name: Copy CMake artifacts
       run: |
         mkdir -p Linux/arm64
-        find /tmp/mp4v2/build -name "libmp4v2.a" -exec cp {} Linux/arm64/ \;
+        cp -P /tmp/mp4v2/install/lib/libmp4v2.so* Linux/arm64/ 2>/dev/null || true
+        find /tmp/mp4v2/install -name "libmp4v2.a" -exec cp {} Linux/arm64/ \; 2>/dev/null || true
         
     - name: Copy headers
       run: |
@@ -75,14 +78,15 @@ jobs:
         
     - name: Verify architecture
       run: |
+        echo "=== Built Files ==="
+        ls -lh Linux/arm64/
+        echo ""
         echo "=== Architecture Verification ==="
-        file Linux/arm64/libmp4v2.a
+        file Linux/arm64/libmp4v2.so* 2>/dev/null || echo "No shared libraries"
+        file Linux/arm64/libmp4v2.a 2>/dev/null || echo "No static library"
         echo ""
-        echo "=== Library Info ==="
-        ar -t Linux/arm64/libmp4v2.a | head -10
-        echo ""
-        echo "=== Size ==="
-        du -h Linux/arm64/libmp4v2.a
+        echo "=== Shared Library Links ==="
+        ls -la Linux/arm64/libmp4v2.so* 2>/dev/null || echo "No shared libraries"
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -129,14 +133,16 @@ jobs:
           arm64v8/ubuntu:22.04 \
           bash -c "
             apt-get update && \
-            apt-get install -y build-essential cmake git autoconf automake libtool && \
+            apt-get install -y build-essential cmake git autoconf automake libtool file && \
             git clone --depth 1 https://github.com/enzo1982/mp4v2.git && \
             cd mp4v2 && \
             mkdir build && cd build && \
-            cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/build/install && \
             make -j\$(nproc) && \
+            make install && \
             mkdir -p /workspace/Linux/arm64 && \
-            find . -name 'libmp4v2.a' -exec cp {} /workspace/Linux/arm64/ \;
+            cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/arm64/ 2>/dev/null || true && \
+            cp /build/install/lib/libmp4v2.a /workspace/Linux/arm64/ 2>/dev/null || true
           "
           
     - name: Upload QEMU artifacts

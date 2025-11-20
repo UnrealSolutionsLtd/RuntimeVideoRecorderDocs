@@ -43,23 +43,34 @@ jobs:
               cmake \
               git \
               wget \
-              ca-certificates
+              ca-certificates \
+              file
             
             # Clone mp4v2
             git clone --depth 1 https://github.com/enzo1982/mp4v2.git
             cd mp4v2
             
-            # Build with CMake
+            # Build with CMake (shared libraries)
             mkdir -p build && cd build
             cmake .. \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_INSTALL_PREFIX=/build/install \
-              -DBUILD_SHARED_LIBS=OFF
+              -DBUILD_SHARED_LIBS=ON
             make -j\$(nproc)
             make install
             
             # Copy to workspace
             mkdir -p /workspace/Linux/arm64
+            
+            # Copy shared libraries
+            if [ -d /build/install/lib ]; then
+              cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/arm64/ 2>/dev/null || true
+            fi
+            if [ -d /build/install/lib64 ]; then
+              cp -P /build/install/lib64/libmp4v2.so* /workspace/Linux/arm64/ 2>/dev/null || true
+            fi
+            
+            # Copy static library if it exists
             if [ -f /build/install/lib/libmp4v2.a ]; then
               cp /build/install/lib/libmp4v2.a /workspace/Linux/arm64/
             fi
@@ -72,7 +83,11 @@ jobs:
             cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/ 2>/dev/null || true
             
             # Verify architecture
-            file /workspace/Linux/arm64/libmp4v2.a
+            echo '=== Built libraries ==='
+            ls -lh /workspace/Linux/arm64/
+            echo ''
+            echo '=== Architecture verification ==='
+            file /workspace/Linux/arm64/libmp4v2.so* 2>/dev/null || file /workspace/Linux/arm64/libmp4v2.a 2>/dev/null || echo 'No libraries found!'
           "
       
     - name: List build artifacts
@@ -110,15 +125,17 @@ jobs:
         git clone --depth 1 https://github.com/enzo1982/mp4v2.git /tmp/mp4v2
         cd /tmp/mp4v2
         mkdir build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/tmp/mp4v2/install
         make -j$(nproc)
+        make install
         
     - name: Copy artifacts
       run: |
         mkdir -p Linux/x64
-        cp /tmp/mp4v2/build/libmp4v2.a Linux/x64/
+        cp -P /tmp/mp4v2/install/lib/libmp4v2.so* Linux/x64/ 2>/dev/null || true
+        cp /tmp/mp4v2/install/lib/libmp4v2.a Linux/x64/ 2>/dev/null || true
         mkdir -p include/mp4v2
-        cp -r /tmp/mp4v2/include/mp4v2/* include/mp4v2/
+        cp -r /tmp/mp4v2/install/include/mp4v2/* include/mp4v2/ 2>/dev/null || cp -r /tmp/mp4v2/include/mp4v2/* include/mp4v2/
         
     - name: Upload Linux x64 artifacts
       uses: actions/upload-artifact@v4
