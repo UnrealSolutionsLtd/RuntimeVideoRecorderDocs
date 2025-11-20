@@ -1,0 +1,148 @@
+name: Build MP4v2 (Native ARM64 Runners)
+
+# This workflow uses native ARM64 runners for faster builds
+# Note: Requires GitHub Team/Enterprise or self-hosted ARM64 runners
+# For free tier, use the QEMU-based workflows instead
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_results:
+        description: 'Commit built libraries to repository'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build-native-arm64:
+    # Use native ARM64 runner (requires GitHub Team/Enterprise)
+    # For self-hosted runners, use: runs-on: [self-hosted, linux, ARM64]
+    runs-on: ubuntu-22.04-arm64  # GitHub-hosted ARM64 runner
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          git \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config
+          
+    - name: Clone MP4v2 repository
+      run: |
+        git clone --depth 1 https://github.com/enzo1982/mp4v2.git /tmp/mp4v2
+        
+    - name: Build with Autotools
+      run: |
+        cd /tmp/mp4v2
+        autoreconf -i
+        ./configure --prefix=$PWD/install --enable-static --disable-shared
+        make -j$(nproc)
+        make install
+        
+    - name: Copy Autotools artifacts
+      run: |
+        mkdir -p Linux/arm64
+        cp /tmp/mp4v2/install/lib/libmp4v2.a Linux/arm64/libmp4v2-autotools.a
+        
+    - name: Build with CMake
+      run: |
+        cd /tmp/mp4v2
+        rm -rf build
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DCMAKE_INSTALL_PREFIX=$PWD/install
+        make -j$(nproc)
+        
+    - name: Copy CMake artifacts
+      run: |
+        mkdir -p Linux/arm64
+        find /tmp/mp4v2/build -name "libmp4v2.a" -exec cp {} Linux/arm64/ \;
+        
+    - name: Copy headers
+      run: |
+        mkdir -p include/mp4v2
+        cp -r /tmp/mp4v2/include/mp4v2/* include/mp4v2/
+        
+    - name: Verify architecture
+      run: |
+        echo "=== Architecture Verification ==="
+        file Linux/arm64/libmp4v2.a
+        echo ""
+        echo "=== Library Info ==="
+        ar -t Linux/arm64/libmp4v2.a | head -10
+        echo ""
+        echo "=== Size ==="
+        du -h Linux/arm64/libmp4v2.a
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mp4v2-linux-arm64-native
+        path: |
+          Linux/arm64/
+          include/mp4v2/
+        retention-days: 90
+        
+    - name: Commit and push built libraries
+      if: ${{ github.event.inputs.commit_results == 'true' }}
+      run: |
+        git config --local user.name "GitHub Actions Bot"
+        git config --local user.email "actions@github.com"
+        git add Linux/arm64/ include/mp4v2/
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Add MP4v2 native ARM64 build [skip ci]"
+          git push
+        fi
+
+  # Fallback to QEMU if native ARM64 runners are not available
+  build-qemu-fallback:
+    runs-on: ubuntu-latest
+    # Only run if native build is skipped or fails
+    if: failure() || cancelled()
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+        
+    - name: Build with QEMU
+      run: |
+        docker run --rm --platform linux/arm64 \
+          -v ${{ github.workspace }}:/workspace \
+          -w /build \
+          arm64v8/ubuntu:22.04 \
+          bash -c "
+            apt-get update && \
+            apt-get install -y build-essential cmake git autoconf automake libtool && \
+            git clone --depth 1 https://github.com/enzo1982/mp4v2.git && \
+            cd mp4v2 && \
+            mkdir build && cd build && \
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
+            make -j\$(nproc) && \
+            mkdir -p /workspace/Linux/arm64 && \
+            find . -name 'libmp4v2.a' -exec cp {} /workspace/Linux/arm64/ \;
+          "
+          
+    - name: Upload QEMU artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mp4v2-linux-arm64-qemu-fallback
+        path: Linux/arm64/
+        retention-days: 30
+

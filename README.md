@@ -65,6 +65,40 @@ The plugin automatically enables these required plugins:
 - **AudioCapture** - For audio recording functionality
 - **ElectraPlayer** - For video playback support
 
+### Building Third-Party Libraries
+
+This repository includes pre-compiled libraries (x264, lsmash, mp4v2) for various platforms. To build MP4v2 for Linux ARM64:
+
+#### Using GitHub Actions (Automated)
+1. Go to the **Actions** tab in your GitHub repository
+2. Select **Build MP4v2 for Linux ARM64** or **Build MP4v2 (CMake) for Multiple Platforms**
+3. Click **Run workflow**
+4. Download the artifacts once the build completes
+
+#### Manual Build for Linux ARM64
+```bash
+# Using Docker with QEMU for cross-compilation
+docker run --rm --platform linux/arm64 \
+  -v $(pwd):/workspace \
+  -w /build \
+  arm64v8/ubuntu:22.04 \
+  bash -c "
+    apt-get update && \
+    apt-get install -y build-essential cmake git autoconf automake libtool && \
+    git clone https://github.com/enzo1982/mp4v2.git && \
+    cd mp4v2 && \
+    mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
+    make -j\$(nproc) && \
+    cp libmp4v2.a /workspace/Linux/arm64/
+  "
+```
+
+The GitHub workflows support:
+- **Linux ARM64** - Using QEMU-based cross-compilation
+- **Linux x64** - Native compilation
+- Both **Autotools** and **CMake** build systems
+
 ---
 
 ## Documentation
