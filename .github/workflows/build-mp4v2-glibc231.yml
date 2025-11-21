@@ -59,13 +59,20 @@ jobs:
             readelf -d /build/install/lib/libmp4v2.so.* | grep GLIBC && \
             
             # Copy built libraries to workspace
+            echo '' && \
+            echo '=== Copying files to workspace ===' && \
             mkdir -p /workspace/Linux/x64 && \
-            cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/x64/ 2>/dev/null || true && \
-            cp /build/install/lib/libmp4v2.a /workspace/Linux/x64/ 2>/dev/null || true && \
+            echo 'Created /workspace/Linux/x64' && \
+            ls -la /build/install/lib/ && \
+            cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/x64/ && \
+            cp /build/install/lib/libmp4v2.a /workspace/Linux/x64/ 2>/dev/null || echo 'No static library found' && \
+            echo 'Files copied to /workspace/Linux/x64:' && \
+            ls -lh /workspace/Linux/x64/ && \
             
             # Copy headers
             mkdir -p /workspace/include/mp4v2 && \
-            cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/
+            cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/ && \
+            echo 'Headers copied successfully'
           "
       
     - name: Verify build artifacts
