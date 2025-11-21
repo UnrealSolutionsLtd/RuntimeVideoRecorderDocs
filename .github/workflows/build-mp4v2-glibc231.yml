@@ -2,325 +2,253 @@ name: Build MP4v2 with glibc 2.31
 
 on:
   workflow_dispatch:
-    inputs:
-      architecture:
-        description: 'Target architecture'
-        required: true
-        default: 'x64'
-        type: choice
-        options:
-          - x64
-          - arm64
-          - both
-      library_type:
-        description: 'Library type'
-        required: true
-        default: 'shared'
-        type: choice
-        options:
-          - shared
-          - static
-          - both
-      commit_changes:
-        description: 'Commit built libraries to repository'
-        required: true
-        default: false
-        type: boolean
 
 jobs:
-  build-x64:
-    if: ${{ github.event.inputs.architecture == 'x64' || github.event.inputs.architecture == 'both' }}
-    runs-on: ubuntu-20.04  # Ubuntu 20.04 uses glibc 2.31
+  build-mp4v2-x64:
+    runs-on: ubuntu-20.04  # Ubuntu 20.04 has glibc 2.31 and GLIBCXX 3.4.28
+    permissions:
+      contents: write
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
       
-      - name: Display glibc version
-        run: ldd --version | head -n 1
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          git \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config \
+          file
       
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake git autoconf automake libtool file
+    - name: Verify build environment
+      run: |
+        echo "=== Build Environment ==="
+        uname -a
+        echo ""
+        echo "=== Compiler Info ==="
+        gcc --version | head -n 1
+        g++ --version | head -n 1
+        echo ""
+        echo "glibc:"
+        ldd --version | head -n 1
+        echo ""
+        echo "GLIBCXX versions:"
+        strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX | tail -5
       
-      - name: Clone mp4v2
-        run: |
-          git clone --depth 1 https://github.com/enzo1982/mp4v2.git
-          cd mp4v2
-          git log -1
+    - name: Build MP4v2 for x64 (glibc 2.31)
+      run: |
+        # Clone mp4v2 repository
+        git clone https://github.com/enzo1982/mp4v2.git
+        cd mp4v2
+        
+        # Build using autotools (shared libraries)
+        autoreconf -i
+        ./configure --prefix=$PWD/install --enable-shared
+        make -j$(nproc)
+        make install
+        
+        # Verify library dependencies
+        echo ""
+        echo "=== Library Info ==="
+        file install/lib/libmp4v2.so*
+        echo ""
+        echo "glibc dependency:"
+        ldd install/lib/libmp4v2.so.* | grep libc
+        readelf -d install/lib/libmp4v2.so.* | grep GLIBC
+        echo ""
+        echo "GLIBCXX dependency:"
+        ldd install/lib/libmp4v2.so.* | grep libstdc++
+        readelf -V install/lib/libmp4v2.so.* | grep GLIBCXX || true
+        
+        # Copy built libraries to workspace
+        mkdir -p ../Linux/x64
+        cp -P install/lib/libmp4v2.so* ../Linux/x64/ 2>/dev/null || true
+        cp install/lib/libmp4v2.a ../Linux/x64/ 2>/dev/null || true
+        
+        # Copy headers
+        mkdir -p ../include/mp4v2
+        cp -r install/include/mp4v2/* ../include/mp4v2/
+        
+        # Create build info file
+        cat > ../Linux/x64/BUILD_INFO.txt << EOF
+        Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+        Architecture: x86_64
+        Platform: Ubuntu 20.04 LTS
+        glibc Version: 2.31
+        GLIBCXX Version: 3.4.28 (GCC 9.x default)
+        Compiler: $(gcc --version | head -n 1)
+        Build Method: Native build on GitHub Actions runner
+        
+        Compatibility:
+        - glibc 2.31 or newer (Ubuntu 20.04+, Debian 11+, RHEL 8+)
+        - GLIBCXX 3.4.25 or newer (GCC 8+)
+        EOF
+        cat ../Linux/x64/BUILD_INFO.txt
       
-      - name: Build shared library
-        if: ${{ github.event.inputs.library_type == 'shared' || github.event.inputs.library_type == 'both' }}
-        run: |
-          cd mp4v2
-          mkdir -p build-shared
-          cd build-shared
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install \
-            -DCMAKE_C_FLAGS="-O3" \
-            -DCMAKE_CXX_FLAGS="-O3"
-          make -j$(nproc)
-          make install
-          
-          # Verify glibc dependency
-          echo "=== Shared library info ==="
-          file install/lib/libmp4v2.so*
-          ldd install/lib/libmp4v2.so.* | grep libc
-          readelf -d install/lib/libmp4v2.so.* | grep GLIBC
-      
-      - name: Build static library
-        if: ${{ github.event.inputs.library_type == 'static' || github.event.inputs.library_type == 'both' }}
-        run: |
-          cd mp4v2
-          mkdir -p build-static
-          cd build-static
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install \
-            -DCMAKE_C_FLAGS="-O3" \
-            -DCMAKE_CXX_FLAGS="-O3"
-          make -j$(nproc)
-          make install
-          
-          # Verify archive
-          echo "=== Static library info ==="
-          file install/lib/libmp4v2.a
-          ar -t install/lib/libmp4v2.a | head -10
-      
-      - name: Copy headers
-        run: |
-          mkdir -p output/include
-          cp -r mp4v2/include/mp4v2 output/include/
-      
-      - name: Prepare artifacts (shared)
-        if: ${{ github.event.inputs.library_type == 'shared' || github.event.inputs.library_type == 'both' }}
-        run: |
-          mkdir -p output/Linux/x64/shared
-          cp -P mp4v2/build-shared/install/lib/libmp4v2.so* output/Linux/x64/shared/
-      
-      - name: Prepare artifacts (static)
-        if: ${{ github.event.inputs.library_type == 'static' || github.event.inputs.library_type == 'both' }}
-        run: |
-          mkdir -p output/Linux/x64/static
-          cp mp4v2/build-static/install/lib/libmp4v2.a output/Linux/x64/static/
-      
-      - name: Create build info
-        run: |
-          cat > output/Linux/x64/BUILD_INFO.txt << EOF
-          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Architecture: x86_64
-          Platform: Linux (Ubuntu 20.04)
-          glibc Version: $(ldd --version | head -n 1 | awk '{print $NF}')
-          Compiler: $(gcc --version | head -n 1)
-          CMake: $(cmake --version | head -n 1)
-          MP4v2 Commit: $(cd mp4v2 && git rev-parse HEAD)
-          Library Type: ${{ github.event.inputs.library_type }}
-          EOF
-          cat output/Linux/x64/BUILD_INFO.txt
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mp4v2-linux-x64-glibc231
-          path: output/
-          retention-days: 30
-      
-      - name: Commit to repository
-        if: ${{ github.event.inputs.commit_changes == true }}
-        run: |
-          # Copy to repository structure
-          mkdir -p Linux/x64
-          cp -r output/Linux/x64/* Linux/x64/
-          mkdir -p include
-          cp -r output/include/* include/
-          
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Commit changes
-          git add Linux/x64/ include/mp4v2/
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Build: MP4v2 x64 with glibc 2.31 ($(date -u +"%Y-%m-%d"))"
-            git push
-          fi
+    - name: Verify build artifacts
+      run: |
+        echo "=== Build Artifacts ==="
+        ls -lh Linux/x64/
+        echo ""
+        echo "=== Library Details ==="
+        file Linux/x64/libmp4v2.so* 2>/dev/null || echo "No shared libraries"
+        file Linux/x64/libmp4v2.a 2>/dev/null || echo "No static library"
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mp4v2-linux-x64-glibc231
+        path: |
+          Linux/x64/
+          include/mp4v2/
+        retention-days: 30
+        
+    - name: Commit and push if changed
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+        git add Linux/x64/ include/mp4v2/
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Add MP4v2 libraries for Linux x64 (glibc 2.31) [skip ci]"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+        fi
+      if: github.event_name != 'pull_request'
 
-  build-arm64:
-    if: ${{ github.event.inputs.architecture == 'arm64' || github.event.inputs.architecture == 'both' }}
-    runs-on: ubuntu-20.04  # Ubuntu 20.04 uses glibc 2.31
+  build-mp4v2-arm64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
       
-      - name: Display glibc version
-        run: ldd --version | head -n 1
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+        
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
       
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-      
-      - name: Build with Docker (ARM64)
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v $PWD:/workspace \
-            -w /build \
-            arm64v8/ubuntu:20.04 \
-            bash -c "
-              # Display environment
-              echo '=== Build Environment ==='
-              uname -a
-              ldd --version | head -n 1
-              
-              # Avoid interactive prompts
-              export DEBIAN_FRONTEND=noninteractive
-              
-              # Install dependencies
-              apt-get update && \
-              apt-get install -y build-essential cmake git autoconf automake libtool file && \
-              
-              # Clone mp4v2
-              git clone --depth 1 https://github.com/enzo1982/mp4v2.git && \
-              cd mp4v2 && \
-              
-              # Build shared library
-              if [ '${{ github.event.inputs.library_type }}' = 'shared' ] || [ '${{ github.event.inputs.library_type }}' = 'both' ]; then
-                echo '=== Building shared library ==='
-                mkdir -p build-shared && cd build-shared && \
-                cmake .. \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DBUILD_SHARED_LIBS=ON \
-                  -DCMAKE_INSTALL_PREFIX=\$PWD/install \
-                  -DCMAKE_C_FLAGS='-O3' \
-                  -DCMAKE_CXX_FLAGS='-O3' && \
-                make -j\$(nproc) && \
-                make install && \
-                
-                echo '=== Shared library info ===' && \
-                file install/lib/libmp4v2.so* && \
-                ldd install/lib/libmp4v2.so.* | grep libc && \
-                readelf -d install/lib/libmp4v2.so.* | grep GLIBC && \
-                
-                mkdir -p /workspace/output/Linux/arm64/shared && \
-                cp -P install/lib/libmp4v2.so* /workspace/output/Linux/arm64/shared/ && \
-                cd ..
-              fi
-              
-              # Build static library
-              if [ '${{ github.event.inputs.library_type }}' = 'static' ] || [ '${{ github.event.inputs.library_type }}' = 'both' ]; then
-                echo '=== Building static library ==='
-                mkdir -p build-static && cd build-static && \
-                cmake .. \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DBUILD_SHARED_LIBS=OFF \
-                  -DCMAKE_INSTALL_PREFIX=\$PWD/install \
-                  -DCMAKE_C_FLAGS='-O3' \
-                  -DCMAKE_CXX_FLAGS='-O3' && \
-                make -j\$(nproc) && \
-                make install && \
-                
-                echo '=== Static library info ===' && \
-                file install/lib/libmp4v2.a && \
-                ar -t install/lib/libmp4v2.a | head -10 && \
-                
-                mkdir -p /workspace/output/Linux/arm64/static && \
-                cp install/lib/libmp4v2.a /workspace/output/Linux/arm64/static/ && \
-                cd ..
-              fi
-              
-              # Copy headers
-              mkdir -p /workspace/output/include && \
-              cp -r include/mp4v2 /workspace/output/include/
-            "
-      
-      - name: Create build info
-        run: |
-          mkdir -p output/Linux/arm64
-          cat > output/Linux/arm64/BUILD_INFO.txt << EOF
-          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          Architecture: aarch64 (ARM64)
-          Platform: Linux (Ubuntu 20.04, via QEMU)
-          glibc Version: 2.31
-          Compiler: GCC (Ubuntu 20.04 default)
-          CMake: $(cmake --version | head -n 1)
-          Library Type: ${{ github.event.inputs.library_type }}
-          Build Method: Docker + QEMU emulation
-          EOF
-          cat output/Linux/arm64/BUILD_INFO.txt
-      
-      - name: Verify output
-        run: |
-          echo "=== Output structure ==="
-          find output -type f -o -type l
-          
-          if [ -f output/Linux/arm64/shared/libmp4v2.so ]; then
-            echo "=== Shared library verification ==="
-            file output/Linux/arm64/shared/libmp4v2.so*
-          fi
-          
-          if [ -f output/Linux/arm64/static/libmp4v2.a ]; then
-            echo "=== Static library verification ==="
-            file output/Linux/arm64/static/libmp4v2.a
-          fi
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mp4v2-linux-arm64-glibc231
-          path: output/
-          retention-days: 30
-      
-      - name: Commit to repository
-        if: ${{ github.event.inputs.commit_changes == true }}
-        run: |
-          # Copy to repository structure
-          mkdir -p Linux/arm64
-          cp -r output/Linux/arm64/* Linux/arm64/
-          mkdir -p include
-          cp -r output/include/* include/
-          
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Commit changes
-          git add Linux/arm64/ include/mp4v2/
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Build: MP4v2 ARM64 with glibc 2.31 ($(date -u +"%Y-%m-%d"))"
-            git push
-          fi
+    - name: Build MP4v2 for ARM64 (glibc 2.31)
+      run: |
+        docker run --rm --platform linux/arm64 \
+          -v ${{ github.workspace }}:/workspace \
+          -w /build \
+          arm64v8/ubuntu:20.04 \
+          bash -c "
+            # Display build environment
+            echo '=== Build Environment ==='
+            uname -a
+            ldd --version | head -n 1
+            
+            # Install build dependencies (non-interactive)
+            export DEBIAN_FRONTEND=noninteractive && \
+            apt-get update && \
+            apt-get install -y \
+              build-essential \
+              cmake \
+              git \
+              autoconf \
+              automake \
+              libtool \
+              pkg-config \
+              file && \
+            
+            # Verify compiler
+            echo '' && \
+            echo '=== Compiler Info ===' && \
+            gcc --version | head -n 1 && \
+            g++ --version | head -n 1 && \
+            echo 'GLIBCXX versions:' && \
+            strings /usr/lib/aarch64-linux-gnu/libstdc++.so.6 | grep GLIBCXX | tail -5 && \
+            
+            # Clone mp4v2 repository
+            git clone https://github.com/enzo1982/mp4v2.git && \
+            cd mp4v2 && \
+            
+            # Build using autotools (shared libraries)
+            autoreconf -i && \
+            ./configure --prefix=/build/install --enable-shared && \
+            make -j\$(nproc) && \
+            make install && \
+            
+            # Verify library dependencies
+            echo '' && \
+            echo '=== Library Info ===' && \
+            file /build/install/lib/libmp4v2.so* && \
+            echo '' && \
+            echo 'glibc dependency:' && \
+            ldd /build/install/lib/libmp4v2.so.* | grep libc && \
+            readelf -d /build/install/lib/libmp4v2.so.* | grep GLIBC && \
+            echo '' && \
+            echo 'GLIBCXX dependency:' && \
+            ldd /build/install/lib/libmp4v2.so.* | grep libstdc++ && \
+            readelf -V /build/install/lib/libmp4v2.so.* | grep GLIBCXX || true && \
+            
+            # Copy built libraries to workspace
+            mkdir -p /workspace/Linux/arm64 && \
+            cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/arm64/ 2>/dev/null || true && \
+            cp /build/install/lib/libmp4v2.a /workspace/Linux/arm64/ 2>/dev/null || true && \
+            
+            # Copy headers
+            mkdir -p /workspace/include/mp4v2 && \
+            cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/ && \
+            
+            # Create build info file
+            cat > /workspace/Linux/arm64/BUILD_INFO.txt << 'EEOF'
+Build Date: \$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+Architecture: aarch64 (ARM64)
+Platform: Ubuntu 20.04 LTS (Docker + QEMU)
+glibc Version: 2.31
+GLIBCXX Version: 3.4.28 (GCC 9.x default)
+Compiler: \$(gcc --version | head -n 1)
+Build Method: Docker + QEMU emulation
 
-  summary:
-    needs: [build-x64, build-arm64]
-    if: always()
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Build Summary
-        run: |
-          echo "## Build MP4v2 with glibc 2.31 Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "- **Architecture:** ${{ github.event.inputs.architecture }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Library Type:** ${{ github.event.inputs.library_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit Changes:** ${{ github.event.inputs.commit_changes }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **glibc Version:** 2.31 (Ubuntu 20.04)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "Download the compiled libraries from the 'Artifacts' section above." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Compatibility" >> $GITHUB_STEP_SUMMARY
-          echo "Libraries built with glibc 2.31 are compatible with:" >> $GITHUB_STEP_SUMMARY
-          echo "- Ubuntu 20.04 LTS and newer" >> $GITHUB_STEP_SUMMARY
-          echo "- Debian 11 (Bullseye) and newer" >> $GITHUB_STEP_SUMMARY
-          echo "- RHEL/CentOS 8 and newer" >> $GITHUB_STEP_SUMMARY
-          echo "- Any Linux distribution with glibc 2.31 or newer" >> $GITHUB_STEP_SUMMARY
+Compatibility:
+- glibc 2.31 or newer (Ubuntu 20.04+, Debian 11+, RHEL 8+)
+- GLIBCXX 3.4.25 or newer (GCC 8+)
+EEOF
+            cat /workspace/Linux/arm64/BUILD_INFO.txt
+          "
+      
+    - name: Verify build artifacts
+      run: |
+        echo "=== Build Artifacts ==="
+        ls -lh Linux/arm64/
+        echo ""
+        echo "=== Library Details ==="
+        file Linux/arm64/libmp4v2.so* 2>/dev/null || echo "No shared libraries"
+        file Linux/arm64/libmp4v2.a 2>/dev/null || echo "No static library"
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mp4v2-linux-arm64-glibc231
+        path: |
+          Linux/arm64/
+          include/mp4v2/
+        retention-days: 30
+        
+    - name: Commit and push if changed
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+        git add Linux/arm64/ include/mp4v2/
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Add MP4v2 libraries for Linux ARM64 (glibc 2.31) [skip ci]"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+        fi
+      if: github.event_name != 'pull_request'
 
