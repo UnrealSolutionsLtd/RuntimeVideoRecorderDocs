@@ -18,7 +18,7 @@
 #define MP4V2_PROJECT_version_minor   1
 #define MP4V2_PROJECT_version_point   3
 #define MP4V2_PROJECT_repo_url        "git@github.com:enzo1982/mp4v2.git"
-#define MP4V2_PROJECT_build           "Fri Nov 21 09:59:16 UTC 2025"
+#define MP4V2_PROJECT_build           "Fri Nov 21 10:20:12 UTC 2025"
 
 /*****************************************************************************/
 
