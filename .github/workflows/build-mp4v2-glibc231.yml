@@ -13,6 +13,16 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Display build environment
+      run: |
+        echo "=== Build Environment ==="
+        uname -a
+        ldd --version | head -n 1
+        echo ""
+        echo "=== Compiler Info ==="
+        gcc --version | head -n 1
+        strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX | tail -3
+      
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -25,21 +35,6 @@ jobs:
           libtool \
           pkg-config \
           file
-      
-    - name: Verify build environment
-      run: |
-        echo "=== Build Environment ==="
-        uname -a
-        echo ""
-        echo "=== Compiler Info ==="
-        gcc --version | head -n 1
-        g++ --version | head -n 1
-        echo ""
-        echo "glibc:"
-        ldd --version | head -n 1
-        echo ""
-        echo "GLIBCXX versions:"
-        strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX | tail -5
       
     - name: Build MP4v2 for x64 (glibc 2.31)
       run: |
@@ -57,14 +52,8 @@ jobs:
         echo ""
         echo "=== Library Info ==="
         file install/lib/libmp4v2.so*
-        echo ""
-        echo "glibc dependency:"
         ldd install/lib/libmp4v2.so.* | grep libc
         readelf -d install/lib/libmp4v2.so.* | grep GLIBC
-        echo ""
-        echo "GLIBCXX dependency:"
-        ldd install/lib/libmp4v2.so.* | grep libstdc++
-        readelf -V install/lib/libmp4v2.so.* | grep GLIBCXX || true
         
         # Copy built libraries to workspace
         mkdir -p ../Linux/x64
@@ -74,22 +63,6 @@ jobs:
         # Copy headers
         mkdir -p ../include/mp4v2
         cp -r install/include/mp4v2/* ../include/mp4v2/
-        
-        # Create build info file
-        cat > ../Linux/x64/BUILD_INFO.txt << EOF
-        Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-        Architecture: x86_64
-        Platform: Ubuntu 20.04 LTS
-        glibc Version: 2.31
-        GLIBCXX Version: 3.4.28 (GCC 9.x default)
-        Compiler: $(gcc --version | head -n 1)
-        Build Method: Native build on GitHub Actions runner
-        
-        Compatibility:
-        - glibc 2.31 or newer (Ubuntu 20.04+, Debian 11+, RHEL 8+)
-        - GLIBCXX 3.4.25 or newer (GCC 8+)
-        EOF
-        cat ../Linux/x64/BUILD_INFO.txt
       
     - name: Verify build artifacts
       run: |
@@ -151,7 +124,7 @@ jobs:
             uname -a
             ldd --version | head -n 1
             
-            # Install build dependencies (non-interactive)
+            # Install build dependencies
             export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
             apt-get install -y \
@@ -164,14 +137,6 @@ jobs:
               pkg-config \
               file && \
             
-            # Verify compiler
-            echo '' && \
-            echo '=== Compiler Info ===' && \
-            gcc --version | head -n 1 && \
-            g++ --version | head -n 1 && \
-            echo 'GLIBCXX versions:' && \
-            strings /usr/lib/aarch64-linux-gnu/libstdc++.so.6 | grep GLIBCXX | tail -5 && \
-            
             # Clone mp4v2 repository
             git clone https://github.com/enzo1982/mp4v2.git && \
             cd mp4v2 && \
@@ -182,18 +147,12 @@ jobs:
             make -j\$(nproc) && \
             make install && \
             
-            # Verify library dependencies
+            # Verify glibc version
             echo '' && \
             echo '=== Library Info ===' && \
             file /build/install/lib/libmp4v2.so* && \
-            echo '' && \
-            echo 'glibc dependency:' && \
             ldd /build/install/lib/libmp4v2.so.* | grep libc && \
             readelf -d /build/install/lib/libmp4v2.so.* | grep GLIBC && \
-            echo '' && \
-            echo 'GLIBCXX dependency:' && \
-            ldd /build/install/lib/libmp4v2.so.* | grep libstdc++ && \
-            readelf -V /build/install/lib/libmp4v2.so.* | grep GLIBCXX || true && \
             
             # Copy built libraries to workspace
             mkdir -p /workspace/Linux/arm64 && \
@@ -202,23 +161,7 @@ jobs:
             
             # Copy headers
             mkdir -p /workspace/include/mp4v2 && \
-            cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/ && \
-            
-            # Create build info file
-            cat > /workspace/Linux/arm64/BUILD_INFO.txt << 'EEOF'
-Build Date: \$(date -u +'%Y-%m-%d %H:%M:%S UTC')
-Architecture: aarch64 (ARM64)
-Platform: Ubuntu 20.04 LTS (Docker + QEMU)
-glibc Version: 2.31
-GLIBCXX Version: 3.4.28 (GCC 9.x default)
-Compiler: \$(gcc --version | head -n 1)
-Build Method: Docker + QEMU emulation
-
-Compatibility:
-- glibc 2.31 or newer (Ubuntu 20.04+, Debian 11+, RHEL 8+)
-- GLIBCXX 3.4.25 or newer (GCC 8+)
-EEOF
-            cat /workspace/Linux/arm64/BUILD_INFO.txt
+            cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/
           "
       
     - name: Verify build artifacts
