@@ -1,0 +1,104 @@
+name: Build FDK-AAC ARM64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-fdkaac-arm64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build FDK-AAC for ARM64 (glibc 2.31)
+      run: |
+        docker run --rm --platform linux/arm64 \
+          -v ${{ github.workspace }}:/workspace \
+          -w /build \
+          arm64v8/ubuntu:20.04 \
+          bash -c "
+            # Display build environment
+            echo '=== Build Environment ==='
+            uname -a
+            ldd --version | head -n 1
+            
+            # Install build dependencies
+            export DEBIAN_FRONTEND=noninteractive && \
+            apt-get update && \
+            apt-get install -y \
+              build-essential \
+              cmake \
+              git \
+              autoconf \
+              automake \
+              libtool \
+              pkg-config \
+              file && \
+            
+            # Clone fdk-aac repository
+            git clone https://github.com/mstorsjo/fdk-aac.git && \
+            cd fdk-aac && \
+            
+            # Build using autotools (shared libraries)
+            autoreconf -i && \
+            CFLAGS='-O2 -s' CXXFLAGS='-O2 -s' ./configure --prefix=/build/install --enable-shared --disable-debug && \
+            make -j\$(nproc) && \
+            make install && \
+            
+            # Verify glibc version
+            echo '' && \
+            echo '=== Library Info ===' && \
+            file /build/install/lib/libfdk-aac.so* && \
+            echo 'Library dependencies:' && \
+            ldd /build/install/lib/libfdk-aac.so.* && \
+            
+            # Copy built libraries to workspace
+            mkdir -p /workspace/Linux/arm64 && \
+            cp -P /build/install/lib/libfdk-aac.so* /workspace/Linux/arm64/ && \
+            
+            # Copy headers
+            mkdir -p /workspace/include/fdk-aac && \
+            cp -r /build/install/include/fdk-aac/* /workspace/include/fdk-aac/
+          "
+      
+    - name: Verify build artifacts
+      run: |
+        echo "=== Build Artifacts ==="
+        ls -lh Linux/arm64/
+        echo ""
+        echo "=== Library Details ==="
+        file Linux/arm64/libfdk-aac.so*
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: fdkaac-linux-arm64-glibc231
+        path: |
+          Linux/arm64/
+          include/fdk-aac/
+        retention-days: 30
+        
+    - name: Commit and push if changed
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+        git add Linux/arm64/ include/fdk-aac/
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Add FDK-AAC libraries for Linux ARM64 (glibc 2.31) [skip ci]"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+        fi
+      if: github.event_name != 'pull_request'
+
