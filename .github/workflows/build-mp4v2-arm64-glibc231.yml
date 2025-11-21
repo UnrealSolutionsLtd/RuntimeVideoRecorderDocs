@@ -52,7 +52,7 @@ jobs:
             
             # Build using autotools (shared libraries)
             autoreconf -i && \
-            ./configure --prefix=/build/install --enable-shared && \
+            CFLAGS='-O2 -s' CXXFLAGS='-O2 -s' ./configure --prefix=/build/install --enable-shared --disable-debug && \
             make -j\$(nproc) && \
             make install && \
             
