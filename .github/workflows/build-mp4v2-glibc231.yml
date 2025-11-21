@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-mp4v2-x64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04  # Ubuntu 20.04 has glibc 2.31 and GLIBCXX 3.4.28
     permissions:
       contents: write
     
@@ -13,57 +13,56 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Display build environment
+      run: |
+        echo "=== Build Environment ==="
+        uname -a
+        ldd --version | head -n 1
+        echo ""
+        echo "=== Compiler Info ==="
+        gcc --version | head -n 1
+        strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | grep GLIBCXX | tail -3
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          git \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config \
+          file
+      
     - name: Build MP4v2 for x64 (glibc 2.31)
       run: |
-        docker run --rm --platform linux/amd64 \
-          -v ${{ github.workspace }}:/workspace \
-          -w /build \
-          ubuntu:20.04 \
-          bash -c "
-            # Display build environment
-            echo '=== Build Environment ==='
-            uname -a
-            ldd --version | head -n 1
-            
-            # Install build dependencies
-            export DEBIAN_FRONTEND=noninteractive && \
-            apt-get update && \
-            apt-get install -y \
-              build-essential \
-              cmake \
-              git \
-              autoconf \
-              automake \
-              libtool \
-              pkg-config \
-              file && \
-            
-            # Clone mp4v2 repository
-            git clone https://github.com/enzo1982/mp4v2.git && \
-            cd mp4v2 && \
-            
-            # Build using autotools (shared libraries)
-            autoreconf -i && \
-            ./configure --prefix=/build/install --enable-shared && \
-            make -j\$(nproc) && \
-            make install && \
-            
-            # Verify glibc version
-            echo '' && \
-            echo '=== Library Info ===' && \
-            file /build/install/lib/libmp4v2.so* && \
-            ldd /build/install/lib/libmp4v2.so.* | grep libc && \
-            readelf -d /build/install/lib/libmp4v2.so.* | grep GLIBC && \
-            
-            # Copy built libraries to workspace
-            mkdir -p /workspace/Linux/x64 && \
-            cp -P /build/install/lib/libmp4v2.so* /workspace/Linux/x64/ 2>/dev/null || true && \
-            cp /build/install/lib/libmp4v2.a /workspace/Linux/x64/ 2>/dev/null || true && \
-            
-            # Copy headers
-            mkdir -p /workspace/include/mp4v2 && \
-            cp -r /build/install/include/mp4v2/* /workspace/include/mp4v2/
-          "
+        # Clone mp4v2 repository
+        git clone https://github.com/enzo1982/mp4v2.git
+        cd mp4v2
+        
+        # Build using autotools (shared libraries)
+        autoreconf -i
+        ./configure --prefix=$PWD/install --enable-shared
+        make -j$(nproc)
+        make install
+        
+        # Verify library dependencies
+        echo ""
+        echo "=== Library Info ==="
+        file install/lib/libmp4v2.so*
+        ldd install/lib/libmp4v2.so.* | grep libc
+        readelf -d install/lib/libmp4v2.so.* | grep GLIBC
+        
+        # Copy built libraries to workspace
+        mkdir -p ../Linux/x64
+        cp -P install/lib/libmp4v2.so* ../Linux/x64/ 2>/dev/null || true
+        cp install/lib/libmp4v2.a ../Linux/x64/ 2>/dev/null || true
+        
+        # Copy headers
+        mkdir -p ../include/mp4v2
+        cp -r install/include/mp4v2/* ../include/mp4v2/
       
     - name: Verify build artifacts
       run: |
@@ -97,6 +96,7 @@ jobs:
       if: github.event_name != 'pull_request'
 
   build-mp4v2-arm64:
+    needs: build-mp4v2-x64
     runs-on: ubuntu-latest
     permissions:
       contents: write
