@@ -55,8 +55,8 @@ jobs:
             echo '' && \
             echo '=== Library Info ===' && \
             file /build/install/lib/libmp4v2.so* && \
-            ldd /build/install/lib/libmp4v2.so.* | grep libc && \
-            readelf -d /build/install/lib/libmp4v2.so.* | grep GLIBC && \
+            echo 'Library dependencies:' && \
+            ldd /build/install/lib/libmp4v2.so.* && \
             
             # Copy built libraries to workspace
             mkdir -p /workspace/Linux/x64 && \
