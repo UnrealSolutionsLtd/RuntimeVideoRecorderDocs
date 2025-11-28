@@ -33,7 +33,6 @@ jobs:
             yasm \
             nasm \
             cmake \
-            meson \
             ninja-build \
             autoconf \
             automake \
@@ -68,6 +67,9 @@ jobs:
             libavahi-common-dev \
             python3 \
             python3-pip
+          
+          # Upgrade meson to a newer version (Ubuntu 22.04 has 0.61.2, but we need >= 0.63)
+          sudo pip3 install --upgrade meson
       
       - name: Clone mpv-build
         run: |
@@ -179,7 +181,6 @@ jobs:
                 yasm \
                 nasm \
                 cmake \
-                meson \
                 ninja-build \
                 autoconf \
                 automake \
@@ -214,6 +215,9 @@ jobs:
                 libavahi-common-dev \
                 python3 \
                 python3-pip
+              
+              # Upgrade meson to a newer version (Ubuntu 22.04 has 0.61.2, but we need >= 0.63)
+              pip3 install --upgrade meson
               
               # Clone mpv-build
               git clone https://github.com/mpv-player/mpv-build.git

@@ -99,14 +99,18 @@ The workflow will produce:
 # Install dependencies (Ubuntu/Debian)
 sudo apt-get update
 sudo apt-get install -y \
-  build-essential git yasm nasm cmake meson ninja-build \
+  build-essential git yasm nasm cmake ninja-build \
   autoconf automake libtool pkg-config \
   libx11-dev libxext-dev libxrandr-dev libxinerama-dev \
   libxcursor-dev libxi-dev libxss-dev libxv-dev \
   libvdpau-dev libva-dev libgl1-mesa-dev \
   libasound2-dev libpulse-dev \
   libfribidi-dev libfreetype6-dev libfontconfig1-dev \
-  libharfbuzz-dev libjpeg-dev libssl-dev
+  libharfbuzz-dev libjpeg-dev libssl-dev \
+  python3 python3-pip
+
+# Upgrade meson (Ubuntu 22.04 has 0.61.2, but libplacebo requires >= 0.63)
+sudo pip3 install --upgrade meson
 
 # Clone and build
 git clone https://github.com/mpv-player/mpv-build.git
@@ -139,14 +143,18 @@ docker run --rm --platform linux/arm64 \
   arm64v8/ubuntu:22.04 \
   bash -c "
     apt-get update && \
-    apt-get install -y build-essential git yasm nasm cmake meson \
+    apt-get install -y build-essential git yasm nasm cmake \
       ninja-build autoconf automake libtool pkg-config \
       libx11-dev libxext-dev libfribidi-dev libfreetype6-dev \
-      libfontconfig1-dev libharfbuzz-dev libjpeg-dev libssl-dev && \
+      libfontconfig1-dev libharfbuzz-dev libjpeg-dev libssl-dev \
+      python3 python3-pip && \
+    pip3 install --upgrade meson && \
     git clone https://github.com/mpv-player/mpv-build.git && \
     cd mpv-build && \
     ./use-mpv-master && \
     printf '%s\n' -Dlibmpv=true >> mpv_options && \
+    printf '%s\n' --enable-vdpau >> ffmpeg_options && \
+    printf '%s\n' --enable-vaapi >> ffmpeg_options && \
     ./rebuild -j\$(nproc) && \
     mkdir -p /workspace/Linux/arm64/lib && \
     find . -name 'libmpv.so*' -exec cp -P {} /workspace/Linux/arm64/lib/ \;
