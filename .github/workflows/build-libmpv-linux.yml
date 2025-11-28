@@ -1,0 +1,346 @@
+name: Build libmpv for Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      mpv_version:
+        description: 'MPV version (master/release/custom tag)'
+        required: false
+        default: 'master'
+      ffmpeg_version:
+        description: 'FFmpeg version (master/release/custom tag)'
+        required: false
+        default: 'master'
+  push:
+    paths:
+      - '.github/workflows/build-libmpv-linux.yml'
+
+jobs:
+  build-linux-x64:
+    name: Build libmpv for Linux x64
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            yasm \
+            nasm \
+            cmake \
+            meson \
+            ninja-build \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            libx11-dev \
+            libxext-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxss-dev \
+            libxv-dev \
+            libvdpau-dev \
+            libva-dev \
+            libgl1-mesa-dev \
+            libasound2-dev \
+            libpulse-dev \
+            libfribidi-dev \
+            libfreetype6-dev \
+            libfontconfig1-dev \
+            libharfbuzz-dev \
+            libjpeg-dev \
+            libssl-dev \
+            libbluray-dev \
+            libdvdread-dev \
+            libdvdnav-dev \
+            libuchardet-dev \
+            zlib1g-dev \
+            liblcms2-dev \
+            libarchive-dev \
+            libavahi-common-dev \
+            python3 \
+            python3-pip
+      
+      - name: Clone mpv-build
+        run: |
+          git clone https://github.com/mpv-player/mpv-build.git
+          cd mpv-build
+      
+      - name: Configure build versions
+        working-directory: mpv-build
+        run: |
+          if [ "${{ inputs.mpv_version }}" == "release" ]; then
+            ./use-mpv-release
+          elif [ "${{ inputs.mpv_version }}" == "master" ] || [ -z "${{ inputs.mpv_version }}" ]; then
+            ./use-mpv-master
+          else
+            ./use-mpv-custom "${{ inputs.mpv_version }}"
+          fi
+          
+          if [ "${{ inputs.ffmpeg_version }}" == "release" ]; then
+            ./use-ffmpeg-release
+          elif [ "${{ inputs.ffmpeg_version }}" == "master" ] || [ -z "${{ inputs.ffmpeg_version }}" ]; then
+            ./use-ffmpeg-master
+          else
+            ./use-ffmpeg-custom "${{ inputs.ffmpeg_version }}"
+          fi
+          
+          ./use-libass-master
+      
+      - name: Configure FFmpeg options
+        working-directory: mpv-build
+        run: |
+          # Enable hardware acceleration only
+          printf "%s\n" --enable-vdpau >> ffmpeg_options
+          printf "%s\n" --enable-vaapi >> ffmpeg_options
+          
+          cat ffmpeg_options
+      
+      - name: Configure MPV options
+        working-directory: mpv-build
+        run: |
+          # libmpv is enabled by default, but we can ensure it's built as shared library
+          printf "%s\n" -Dlibmpv=true >> mpv_options
+          printf "%s\n" -Dlua=enabled >> mpv_options
+          printf "%s\n" -Djavascript=disabled >> mpv_options
+          
+          cat mpv_options
+      
+      - name: Build
+        working-directory: mpv-build
+        run: |
+          ./rebuild -j$(nproc)
+      
+      - name: Collect libraries
+        run: |
+          mkdir -p artifacts/Linux/x64/lib
+          mkdir -p artifacts/Linux/x64/include
+          
+          # Copy libmpv shared library
+          find mpv-build -name "libmpv.so*" -exec cp -P {} artifacts/Linux/x64/lib/ \;
+          
+          # Copy headers
+          if [ -d "mpv-build/mpv/build/libmpv" ]; then
+            cp -r mpv-build/mpv/build/libmpv/*.h artifacts/Linux/x64/include/ 2>/dev/null || true
+          fi
+          if [ -d "mpv-build/mpv/libmpv" ]; then
+            cp -r mpv-build/mpv/libmpv/*.h artifacts/Linux/x64/include/ 2>/dev/null || true
+          fi
+          
+          # List what we collected
+          ls -lah artifacts/Linux/x64/lib/
+          ls -lah artifacts/Linux/x64/include/ || true
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-linux-x64
+          path: artifacts/Linux/x64/
+          retention-days: 30
+
+  build-linux-arm64:
+    name: Build libmpv for Linux ARM64
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build in ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -w /build \
+            arm64v8/ubuntu:22.04 \
+            bash -c "
+              set -e
+              
+              # Install dependencies
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                build-essential \
+                git \
+                yasm \
+                nasm \
+                cmake \
+                meson \
+                ninja-build \
+                autoconf \
+                automake \
+                libtool \
+                pkg-config \
+                libx11-dev \
+                libxext-dev \
+                libxrandr-dev \
+                libxinerama-dev \
+                libxcursor-dev \
+                libxi-dev \
+                libxss-dev \
+                libxv-dev \
+                libvdpau-dev \
+                libva-dev \
+                libgl1-mesa-dev \
+                libasound2-dev \
+                libpulse-dev \
+                libfribidi-dev \
+                libfreetype6-dev \
+                libfontconfig1-dev \
+                libharfbuzz-dev \
+                libjpeg-dev \
+                libssl-dev \
+                libbluray-dev \
+                libdvdread-dev \
+                libdvdnav-dev \
+                libuchardet-dev \
+                zlib1g-dev \
+                liblcms2-dev \
+                libarchive-dev \
+                libavahi-common-dev \
+                python3 \
+                python3-pip
+              
+              # Clone mpv-build
+              git clone https://github.com/mpv-player/mpv-build.git
+              cd mpv-build
+              
+              # Configure versions
+              if [ \"${{ inputs.mpv_version }}\" == \"release\" ]; then
+                ./use-mpv-release
+              elif [ \"${{ inputs.mpv_version }}\" == \"master\" ] || [ -z \"${{ inputs.mpv_version }}\" ]; then
+                ./use-mpv-master
+              else
+                ./use-mpv-custom \"${{ inputs.mpv_version }}\"
+              fi
+              
+              if [ \"${{ inputs.ffmpeg_version }}\" == \"release\" ]; then
+                ./use-ffmpeg-release
+              elif [ \"${{ inputs.ffmpeg_version }}\" == \"master\" ] || [ -z \"${{ inputs.ffmpeg_version }}\" ]; then
+                ./use-ffmpeg-master
+              else
+                ./use-ffmpeg-custom \"${{ inputs.ffmpeg_version }}\"
+              fi
+              
+              ./use-libass-master
+              
+              # Configure FFmpeg options (hardware acceleration only)
+              printf \"%s\n\" --enable-vdpau >> ffmpeg_options
+              printf \"%s\n\" --enable-vaapi >> ffmpeg_options
+              
+              # Configure MPV options
+              printf \"%s\n\" -Dlibmpv=true >> mpv_options
+              printf \"%s\n\" -Dlua=enabled >> mpv_options
+              printf \"%s\n\" -Djavascript=disabled >> mpv_options
+              
+              # Build
+              ./rebuild -j\$(nproc)
+              
+              # Collect libraries
+              mkdir -p /workspace/artifacts/Linux/arm64/lib
+              mkdir -p /workspace/artifacts/Linux/arm64/include
+              
+              # Copy libmpv shared library
+              find . -name \"libmpv.so*\" -exec cp -P {} /workspace/artifacts/Linux/arm64/lib/ \;
+              
+              # Copy headers
+              if [ -d \"mpv/build/libmpv\" ]; then
+                cp mpv/build/libmpv/*.h /workspace/artifacts/Linux/arm64/include/ 2>/dev/null || true
+              fi
+              if [ -d \"mpv/libmpv\" ]; then
+                cp mpv/libmpv/*.h /workspace/artifacts/Linux/arm64/include/ 2>/dev/null || true
+              fi
+              
+              # List what we collected
+              ls -lah /workspace/artifacts/Linux/arm64/lib/
+              ls -lah /workspace/artifacts/Linux/arm64/include/ || true
+            "
+      
+      - name: Verify artifacts
+        run: |
+          ls -lah artifacts/Linux/arm64/lib/
+          file artifacts/Linux/arm64/lib/libmpv.so* || true
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-linux-arm64
+          path: artifacts/Linux/arm64/
+          retention-days: 30
+
+  create-release-package:
+    name: Create Combined Release Package
+    runs-on: ubuntu-latest
+    needs: [build-linux-x64, build-linux-arm64]
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libmpv-linux-x64
+          path: Linux/x64/
+      
+      - name: Download ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libmpv-linux-arm64
+          path: Linux/arm64/
+      
+      - name: Create package info
+        run: |
+          cat > Linux/BUILD_INFO.txt << EOF
+          libmpv Build Information
+          ========================
+          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          MPV Version: ${{ inputs.mpv_version || 'master' }}
+          FFmpeg Version: ${{ inputs.ffmpeg_version || 'master' }}
+          
+          Built from: https://github.com/mpv-player/mpv-build
+          
+          Architectures:
+          - x64 (Linux)
+          - ARM64 (Linux)
+          
+          Libraries included:
+          - libmpv (shared library)
+          - Headers for integration
+          
+          Features:
+          - Hardware-accelerated video decoding (VDPAU, VAAPI)
+          - Multiple codec support (H.264, H.265, VP8, VP9, etc.)
+          - Lua scripting support
+          - Audio output (ALSA, PulseAudio)
+          
+          Note: Built for video playback with hardware acceleration support.
+          EOF
+      
+      - name: List final structure
+        run: |
+          echo "Final package structure:"
+          find Linux -type f
+      
+      - name: Upload combined package
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-linux-all-architectures
+          path: Linux/
+          retention-days: 90
+
